@@ -1,10 +1,14 @@
 from board.coordenates import Coordenate   # importar arriba
 
 class Piece:
-    def __init__(self, col:str, row:int):
+    selected = False
+
+    def __init__(self,type:str,color:str, col:str, row:int):
         self.position = Coordenate(col, row) 
+        self.color = color
+        self.type = type
 
     
-    def move_vertical(self,vector_col:int, vector_row:int):
+    def move(self, vector_row:int,vector_col:int):
         self.position.move_row(vector_row)
         self.position.move_col(vector_col)
