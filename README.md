@@ -1,2 +1,2 @@
 # FinalProgramacion
-Trabajo final de programación, una plataforma que puede contener múltiples aplicaciones 
+Trabajo final de programación, unn juego de ajedrez contra una ia
