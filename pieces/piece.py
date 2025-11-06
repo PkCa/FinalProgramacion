@@ -3,7 +3,7 @@ from board.coordenates import Coordenate   # importar arriba
 class Piece:
     selected = False
 
-    def __init__(self,type:str,color:str, col:str, row:int):
+    def __init__(self,type:str,color:str, col:str, row:int, movements:dict):
         self.position = Coordenate(col, row) 
         self.color = color
         self.type = type
