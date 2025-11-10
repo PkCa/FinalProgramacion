@@ -1,12 +1,12 @@
 from typing import Optional, List, Tuple, Dict, Any
 
-from coordinate import Coordinate
-from pawn import Pawn
-from knight import Knight
-from bishop import Bishop
-from rook import Rook
-from queen import Queen
-from king import King
+from board.coordenates import Coordenate
+from pieces.pawn import Pawn
+from pieces.knight import Knight
+from pieces.bishop import Bishop
+from pieces.rook import Rook
+from pieces.queen import Queen
+from pieces.king import King
 
 FILES = "abcdefgh"
 
@@ -43,12 +43,12 @@ class Board:
         ]
         for name, col in pieces_order:
             piece = self._make_piece(name, color, col, row)
-            self._set_piece_at(Coordinate(col, row), piece)
+            self._set_piece_at(Coordenate(col, row), piece)
 
     def _place_pawns(self, color: str, row: int) -> None:
         for col in FILES:
             piece = Pawn(color, col, row)
-            self._set_piece_at(Coordinate(col, row), piece)
+            self._set_piece_at(Coordenate(col, row), piece)
 
     def _make_piece(self, name: str, color: str, col: str, row: int):
         if name == "rook":
@@ -66,40 +66,40 @@ class Board:
         raise ValueError(f"Pieza desconocida: {name}")
 
 
-    def _coord_to_idx(self, c: Coordinate) -> Tuple[int, int]:
+    def _coord_to_idx(self, c: Coordenate) -> Tuple[int, int]:
         r_i = c.row - 1
         c_i = ord(c.col) - ord('a')
         if not (0 <= r_i < 8 and 0 <= c_i < 8):
             raise IndexError(f"Coordenada fuera de rango: {c}")
         return r_i, c_i
 
-    def _idx_to_coord(self, r_i: int, c_i: int) -> Coordinate:
-        return Coordinate(chr(ord('a') + c_i), r_i + 1)
+    def _idx_to_coord(self, r_i: int, c_i: int) -> Coordenate:
+        return Coordenate(chr(ord('a') + c_i), r_i + 1)
 
-    def get_piece_at(self, coord: Coordinate):
+    def get_piece_at(self, coord: Coordenate):
         r_i, c_i = self._coord_to_idx(coord)
         return self.board[r_i][c_i]
 
-    def _set_piece_at(self, coord: Coordinate, piece: Optional[object]) -> None:
+    def _set_piece_at(self, coord: Coordenate, piece: Optional[object]) -> None:
         r_i, c_i = self._coord_to_idx(coord)
         self.board[r_i][c_i] = piece
 
-    def is_empty(self, coord: Coordinate) -> bool:
+    def is_empty(self, coord: Coordenate) -> bool:
         return self.get_piece_at(coord) is None
 
-    def piece_color_at(self, coord: Coordinate) -> Optional[str]:
+    def piece_color_at(self, coord: Coordenate) -> Optional[str]:
         p = self.get_piece_at(coord)
         return getattr(p, "color", None) if p else None
 
     # ----------------------------- Utilidades --------------------------------
 
-    def to_coordinate(self, square: str) -> Coordinate:
+    def to_Coordenate(self, square: str) -> Coordenate:
         square = square.strip().lower()
         if len(square) != 2 or square[0] not in FILES or square[1] not in "12345678":
             raise ValueError(f"Square inválido: {square}")
-        return Coordinate(square[0], int(square[1]))
+        return Coordenate(square[0], int(square[1]))
 
-    def king_position(self, color: str) -> Coordinate:
+    def king_position(self, color: str) -> Coordenate:
         for r in range(8):
             for c in range(8):
                 p = self.board[r][c]
@@ -107,9 +107,9 @@ class Board:
                     return self._idx_to_coord(r, c)
         raise ValueError(f"No se encontró el rey de color {color}")
 
-    def squares_between(self, a: Coordinate, b: Coordinate) -> List[Coordinate]:
+    def squares_between(self, a: Coordenate, b: Coordenate) -> List[Coordenate]:
         # Devuelve las casillas estrictamente entre a y b si están alineadas en recta/diagonal
-        res: List[Coordinate] = []
+        res: List[Coordenate] = []
         df = (ord(b.col) - ord(a.col))
         dr = (b.row - a.row)
         step_f = 0 if df == 0 else (1 if df > 0 else -1)
@@ -124,7 +124,7 @@ class Board:
         while (f != ord(b.col)) or (r != b.row):
             if (f == ord(b.col)) and (r == b.row):
                 break
-            res.append(Coordinate(chr(f), r))
+            res.append(Coordenate(chr(f), r))
             f += step_f
             r += step_r
             if chr(f) == b.col and r == b.row:
@@ -132,13 +132,13 @@ class Board:
         # quitar extremos si se metió el destino por la condición
         return [c for c in res if not (c.col == b.col and c.row == b.row)]
 
-    def is_square_attacked(self, coord: Coordinate, by_color: str) -> bool:
+    def is_square_attacked(self, coord: Coordenate, by_color: str) -> bool:
         # Ataques de peones
         for df in (-1, 1):
             r = coord.row + (-1 if by_color == "white" else 1)
             f = chr(ord(coord.col) + df)
             if f in FILES and 1 <= r <= 8:
-                c = Coordinate(f, r)
+                c = Coordenate(f, r)
                 p = self.get_piece_at(c)
                 if p and getattr(p, "color", None) == by_color and getattr(p, "name", getattr(p, "type", None)) == "pawn":
                     return True
@@ -148,7 +148,7 @@ class Board:
             r = coord.row + dr
             f = chr(ord(coord.col) + df)
             if f in FILES and 1 <= r <= 8:
-                c = Coordinate(f, r)
+                c = Coordenate(f, r)
                 p = self.get_piece_at(c)
                 if p and getattr(p, "color", None) == by_color and getattr(p, "name", getattr(p, "type", None)) == "knight":
                     return True
@@ -171,14 +171,14 @@ class Board:
                 r = coord.row + dr
                 f = chr(ord(coord.col) + df)
                 if f in FILES and 1 <= r <= 8:
-                    c = Coordinate(f, r)
+                    c = Coordenate(f, r)
                     p = self.get_piece_at(c)
                     if p and getattr(p, "color", None) == by_color and getattr(p, "name", getattr(p, "type", None)) == "king":
                         return True
 
         return False
 
-    def _ray_hits(self, target: Coordinate, df: int, dr: int, by_color: str, sliding: Tuple[str, ...]) -> bool:
+    def _ray_hits(self, target: Coordenate, df: int, dr: int, by_color: str, sliding: Tuple[str, ...]) -> bool:
         f_i = ord(target.col) - ord('a')
         r_i = target.row - 1
         while True:
@@ -194,13 +194,13 @@ class Board:
                     return True
                 return False
 
-    def find_sources(self, piece_name: str, color: str, to_coord: Coordinate, san_hint: Dict[str, Any]) -> List[Coordinate]:
+    def find_sources(self, piece_name: str, color: str, to_coord: Coordenate, san_hint: Dict[str, Any]) -> List[Coordenate]:
         """
         Busca piezas del tipo/color dado que podrían ir a 'to_coord' por patrón básico
         y sin capturar aliado. Para peones, usa origin_file si viene en san_hint.
         (No verifica jaque propio ni "pinned"; eso lo resuelve un gestor superior.)
         """
-        candidates: List[Coordinate] = []
+        candidates: List[Coordenate] = []
         origin_file = san_hint.get("origin_file")
 
         # Peones: tratar distinto porque dependen del color/dirección
@@ -210,20 +210,20 @@ class Board:
                 f = chr(ord(to_coord.col) + df)
                 if origin_file and f != origin_file:
                     continue
-                src = Coordinate(f, to_coord.row - (1 if color == "white" else -1))
+                src = Coordenate(f, to_coord.row - (1 if color == "white" else -1))
                 if self._on_board(src) and self._is_piece(src, "pawn", color):
                     # Para SAN mínima nos basta; el capturado se chequeará en apply_move
                     candidates.append(src)
 
             # Avances rectos (1 o 2)
             f = to_coord.col
-            one = Coordinate(f, to_coord.row - (1 if color == "white" else -1))
+            one = Coordenate(f, to_coord.row - (1 if color == "white" else -1))
             if self._on_board(one) and self._is_piece(one, "pawn", color) and self.is_empty(to_coord):
                 candidates.append(one)
             # doble (desde inicial)
             start = 2 if color == "white" else 7
-            two = Coordinate(f, to_coord.row - (2 if color == "white" else -2))
-            inter = Coordinate(f, start + (1 if color == "white" else -1)) if to_coord.row == (start + (2 if color == "white" else -2)) else None
+            two = Coordenate(f, to_coord.row - (2 if color == "white" else -2))
+            inter = Coordenate(f, start + (1 if color == "white" else -1)) if to_coord.row == (start + (2 if color == "white" else -2)) else None
             if self._on_board(two) and self._is_piece(two, "pawn", color) and inter and self.is_empty(inter) and self.is_empty(to_coord):
                 candidates.append(two)
 
@@ -304,11 +304,11 @@ class Board:
 
     def _apply_castle(self, color: str, side: str) -> None:
         back = 1 if color == "white" else 8
-        king_from = Coordinate("e", back)
+        king_from = Coordenate("e", back)
         if side == "king":
-            king_to, rook_from, rook_to = Coordinate("g", back), Coordinate("h", back), Coordinate("f", back)
+            king_to, rook_from, rook_to = Coordenate("g", back), Coordenate("h", back), Coordenate("f", back)
         else:
-            king_to, rook_from, rook_to = Coordinate("c", back), Coordinate("a", back), Coordinate("d", back)
+            king_to, rook_from, rook_to = Coordenate("c", back), Coordenate("a", back), Coordenate("d", back)
 
         king = self.get_piece_at(king_from)
         rook = self.get_piece_at(rook_from)
@@ -326,10 +326,10 @@ class Board:
         except Exception:
             pass
 
-    def _on_board(self, c: Coordinate) -> bool:
+    def _on_board(self, c: Coordenate) -> bool:
         return c.col in FILES and 1 <= c.row <= 8
 
-    def _is_piece(self, coord: Coordinate, name: str, color: str) -> bool:
+    def _is_piece(self, coord: Coordenate, name: str, color: str) -> bool:
         p = self.get_piece_at(coord)
         if not p:
             return False
@@ -337,11 +337,11 @@ class Board:
         pcolor = getattr(p, "color", None)
         return pname == name and pcolor == color
 
-    def _same_color_at(self, coord: Coordinate, color: str) -> bool:
+    def _same_color_at(self, coord: Coordenate, color: str) -> bool:
         p = self.get_piece_at(coord)
         return bool(p) and getattr(p, "color", None) == color
 
-    def _pattern_ok(self, src: Coordinate, dst: Coordinate, name: str) -> bool:
+    def _pattern_ok(self, src: Coordenate, dst: Coordenate, name: str) -> bool:
         df = (ord(dst.col) - ord(src.col))
         dr = (dst.row - src.row)
         adf, adr = abs(df), abs(dr)
@@ -361,7 +361,7 @@ class Board:
             return True
         return False
 
-    def _path_clear(self, src: Coordinate, dst: Coordinate) -> bool:
+    def _path_clear(self, src: Coordenate, dst: Coordenate) -> bool:
         # Para piezas deslizantes (bishop/rook/queen)
         between = self.squares_between(src, dst)
         return all(self.is_empty(c) for c in between)
