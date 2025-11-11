@@ -1,4 +1,3 @@
-```markdown
 ## Sistema de movimiento de piezas
 
 La clase `Coordenate` define posiciones mediante **columna (letra)** y **fila (número)**.  
@@ -14,8 +13,8 @@ Los movimientos se expresan en **vectores**, y la función `move()` actualiza la
 ### Soporte especial
 
 El gestor de movimientos de la partida soporta reglas especiales como:
-- Enroque del rey  
-- Captura al paso del peón  
+- Enroque del rey (Aun no esta implementado en el juego final)
+- Captura al paso del peón (Aun no esta implementado en el juego final)
 
 ---
 
@@ -27,7 +26,7 @@ El peón se mueve siempre **una casilla hacia adelante**, dependiendo de su colo
 
 Puede moverse **dos casillas** si está en su posición inicial.  
 Puede **capturar en diagonal** (una casilla hacia adelante y una hacia la izquierda o derecha).  
-Además, tiene soporte para **captura al paso** (*en passant*).
+Además, tiene soporte para **captura al paso** (*en passant*) (No implementado). 
 
 Funciones:
 
@@ -107,7 +106,7 @@ Atributos:
 ## KING (Rey)
 
 El rey se mueve **una casilla** en cualquier dirección.  
-Además, puede realizar el movimiento especial de **enroque**,  
+Además, puede realizar el movimiento especial de **enroque** (No implementado),  
 donde se mueve dos columnas hacia un lado junto a la torre correspondiente.
 
 Funciones:
@@ -120,4 +119,3 @@ Atributos:
 
 - has_moved → Controla si ya se movió (para enroque)
 - check → Marca si el rey está en jaque (True o False)
-```

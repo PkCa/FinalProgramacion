@@ -1,7 +1,5 @@
 # Documentación técnica — Board, MovementsRecorder y Coordinate
 
-> Esta guía describe el contrato público, responsabilidades y flujo de trabajo entre los módulos **Board**, **MovementsRecorder** y **Coordinate** (a veces escrito "Coordenate" en el proyecto). Está pensada como referencia rápida para implementación, pruebas e integración con la capa de UI (Pygame).
-
 ---
 
 ## 1) Coordinate (Coordenate)
@@ -14,30 +12,6 @@ Representa una casilla del tablero de ajedrez con **columna** (letra `a..h`) y *
 
 * `col: str` — letra entre `a` y `h`.
 * `row: int` — entero entre `1` y `8`.
-
-### Reglas de dominio
-
-* Una coordenada válida siempre cumple `col ∈ {'a'..'h'}` y `row ∈ {1..8}`.
-* El sistema de referencia usado en todo el proyecto es **a1** en la esquina inferior izquierda para blancas (convención estándar en ajedrez).
-
-### Métodos (recomendados / habituales)
-
-> La implementación concreta puede variar. Estos son los más usados por las capas superiores.
-
-* `__init__(col: str, row: int)` — Crea la coordenada.
-* `__repr__() -> str` — Suele devolver `"e4"` (útil para logs y SAN).
-* **Opcionales útiles** (si existen en tu clase):
-
-  * `next_by_vector(vector_row: int, vector_col: int) -> Coordinate` — Retorna una nueva coordenada desplazada por el vector.
-  * `is_in_board() -> bool` — Indica si la coordenada cae dentro del 8×8.
-
-### Ejemplos
-
-```python
-c1 = Coordinate('e', 2)  # e2
-c2 = Coordinate('g', 7)  # g7
-repr(c1)  # 'e2'
-```
 
 ---
 
@@ -55,8 +29,6 @@ Mantiene el **estado material** del juego en un arreglo 2D 8×8 con instancias r
   * Columna (índice) = `ord(col) - ord('a')` (a→0, h→7)
 * **Inicialización:** coloca todas las piezas en su posición inicial estándar (primero instancia, luego ubica).
 
-### API pública principal
-
 * **Lectura / escritura**
 
   * `get_piece_at(coord: Coordinate) -> Optional[Piece]` — Devuelve la pieza (o `None`).
@@ -72,11 +44,11 @@ Mantiene el **estado material** del juego en un arreglo 2D 8×8 con instancias r
 * **Ataque y legalidad básica**
 
   * `is_square_attacked(coord: Coordinate, by_color: str) -> bool` — `True` si la casilla está atacada por el color dado (peones, caballos, deslizantes —alfiles/torres/reinas— y rey adyacente).
-  * `has_legal_moves(color: str) -> bool` — *Versión mínima*: explora seudomovimientos y simula si el rey queda a salvo. Útil para determinar mate cuando combinado con jaque.
+  * `has_legal_moves(color: str) -> bool` — *Versión mínima*: explora movimientos y simula si el rey queda a salvo (No implementado).
 
-* **Resolución para SAN y registradores**
+* **Registradores**
 
-  * `find_sources(piece_name: str, color: str, to_coord: Coordinate, san_hint: dict) -> List[Coordinate]` — Candidatos de origen que **podrían** llegar a destino `to_coord` por patrón y camino libre. Para peones usa pista de archivo si viene en SAN (p. ej., `exd5`). No valida jaque propio.
+  * `find_sources(piece_name: str, color: str, to_coord: Coordinate, san_hint: dict) -> List[Coordinate]` — Candidatos de origen que **podrían** llegar a destino `to_coord` por patrón y camino libre.
 
 * **Aplicación de movimientos**
 
@@ -84,23 +56,12 @@ Mantiene el **estado material** del juego en un arreglo 2D 8×8 con instancias r
 
 * **Depuración**
 
-  * `to_ascii() -> str` — Dibujo de texto del tablero (útil para tests rápidos en consola).
+  * `to_ascii() -> str` — Dibujo de texto del tablero (para tests rápidos en consola).
 
 ### Invariantes y consideraciones
 
 * `Board` **no** decide la legalidad total: su rol es de **estado + utilidades**. Reglas como jaque, enroque permisible, en passant disponible, etc., se coordinan con `MovementsRecorder`.
 * `apply_move` **mueve** piezas reales en el estado del tablero: úsese solamente desde una capa que controle la validez del movimiento.
-
-### Ejemplo de uso
-
-```python
-from board.board import Board
-from coordinate import Coordinate
-
-b = Board()
-print(b.to_ascii())
-print(b.get_piece_at(Coordinate('e', 2)))  # Peón blanco inicial
-```
 
 ---
 
@@ -110,17 +71,15 @@ print(b.get_piece_at(Coordinate('e', 2)))  # Peón blanco inicial
 
 Actúa como **intermediario** y **bitácora** de todos los movimientos. Registra historial con notación algebraica estándar (SAN), aplica los movimientos sobre `Board`, y determina estados clave:
 
-* Jaque (`+`) y **jaque mate** (`#`).
-* Elegibilidad de **captura al paso** (casilla objetivo y qué peón la habilitó).
-* Posibilidad de **enroque** corto/largo (según posición actual y reglas básicas).
+* Jaque (`+`) y **jaque mate** (`#`) (No implementado el jaque mate aun).
+* Elegibilidad de **captura al paso** (casilla objetivo y qué peón la habilitó) (No implementado).
+* Posibilidad de **enroque** corto/largo (según posición actual y reglas básicas) (No implementado).
 
 ### Estado interno
 
 * `history: List[Move]` — lista de movimientos (estructura `Move` con `piece`, `color`, `src`, `dst`, flags como `is_check`, `is_mate`, `is_en_passant_capture`, `castle_side`, `promotion`, y `san`).
 * `_en_passant: Optional[dict]` — ventana de en passant activa, p. ej. `{ 'target': Coordinate, 'by_pawn_at': Coordinate, 'color': 'white'|'black' }`.
 * `board: BoardLike` — referencia al tablero sobre el que se aplican los movimientos.
-
-### API pública
 
 * `add(piece: str, color: str, src: Coordinate, dst: Coordinate, capture: Optional[bool] = None, promotion: Optional[str] = None) -> Move`
 
@@ -159,27 +118,6 @@ Actúa como **intermediario** y **bitácora** de todos los movimientos. Registra
 * El **parser SAN** es intencionalmente mínimo y puede requerir desambiguación adicional en posiciones complejas.
 * `has_legal_moves` es una aproximación útil para mate, pero no sustituye a un motor completo (EP/promoción como recurso defensivo pueden requerir ampliar).
 
-### Ejemplos
-
-```python
-from board.board import Board
-from coordinate import Coordinate
-from movements_recorder import MovementsRecorder
-
-board = Board()
-mr = MovementsRecorder(board)
-
-# Movimiento explícito
-mr.add(piece="pawn", color="white", src=Coordinate('e',2), dst=Coordinate('e',4))
-
-# Movimiento en SAN
-mr.add_san("Nf3", color="white")
-
-print([m.san for m in mr.history])
-print(mr.en_passant_info())
-print(mr.can_castle_kingside("white"), mr.can_castle_queenside("white"))
-```
-
 ---
 
 ## Integración entre módulos
@@ -190,17 +128,6 @@ print(mr.can_castle_kingside("white"), mr.can_castle_queenside("white"))
   * `MovementsRecorder` decide **qué** mover (y cómo anotar) y llama a `Board.apply_move` para **materializar** el cambio.
   * `MovementsRecorder` consulta en `Board` utilidades de ataque, posición de reyes, casillas intermedias y resolución de orígenes para SAN.
 
-### Buenas prácticas
-
-* Mantener **`Board` libre de reglas de alto nivel**: su foco es estado y operaciones atómicas y de consulta.
-* Usar `MovementsRecorder` para el **historial, SAN y reglas especiales** (enroque, EP, jaque/mate).
-* Validar entradas con `Coordinate` para evitar estados imposibles.
-
 ---
 
-## Glosario rápido
-
-* **SAN (Standard Algebraic Notation)**: Notación algebraica estándar: `e4`, `Nf3`, `O-O`, `Qxe5+`, `e8=Q#`.
-* **Enroque (castling)**: `O-O` (lado de rey) y `O-O-O` (lado de dama). El rey se mueve dos columnas; la torre salta por detrás.
-* **En passant**: Captura especial de peón permitida **solo** inmediatamente tras el avance doble enemigo.
-* **Jaque / Mate**: `+` si el rey rival queda atacado; `#` si además **no** tiene movimientos legales.
+En un futuro se pueden implementar guardados de partida con el atributo history de esta clase, guardandolo en un archivo.
