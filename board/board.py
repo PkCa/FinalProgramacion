@@ -17,7 +17,11 @@ class Board:
         self.board: List[List[Optional[object]]] = self._empty_board()
         # Coloca las piezas en su posición inicial (instanciando primero)
         self._place_initial_position()
-        
+
+    # ------------------------------------------------------------------ utils
+    def _C(self, col: str, row: int) -> Coordenate:
+        """Helper: crea Coordenate usando el orden correcto (row, col)."""
+        return Coordenate(row, col)
 
     def _empty_board(self) -> List[List[Optional[object]]]:
         return [[None for _ in range(8)] for _ in range(8)]
@@ -43,12 +47,12 @@ class Board:
         ]
         for name, col in pieces_order:
             piece = self._make_piece(name, color, col, row)
-            self._set_piece_at(Coordenate(col, row), piece)
+            self._set_piece_at(self._C(col, row), piece)
 
     def _place_pawns(self, color: str, row: int) -> None:
         for col in FILES:
             piece = Pawn(color, col, row)
-            self._set_piece_at(Coordenate(col, row), piece)
+            self._set_piece_at(self._C(col, row), piece)
 
     def _make_piece(self, name: str, color: str, col: str, row: int):
         if name == "rook":
@@ -65,6 +69,7 @@ class Board:
             return Pawn(color, col, row)
         raise ValueError(f"Pieza desconocida: {name}")
 
+    # --------------------------- Conversión índices --------------------------
 
     def _coord_to_idx(self, c: Coordenate) -> Tuple[int, int]:
         r_i = c.row - 1
@@ -74,7 +79,10 @@ class Board:
         return r_i, c_i
 
     def _idx_to_coord(self, r_i: int, c_i: int) -> Coordenate:
-        return Coordenate(chr(ord('a') + c_i), r_i + 1)
+        # OJO: Coordenate espera (row, col)
+        return Coordenate(r_i + 1, chr(ord('a') + c_i))
+
+    # --------------------------- Getters / Setters ---------------------------
 
     def get_piece_at(self, coord: Coordenate):
         r_i, c_i = self._coord_to_idx(coord)
@@ -97,7 +105,8 @@ class Board:
         square = square.strip().lower()
         if len(square) != 2 or square[0] not in FILES or square[1] not in "12345678":
             raise ValueError(f"Square inválido: {square}")
-        return Coordenate(square[0], int(square[1]))
+        # Coordenate(row:int, col:str)
+        return Coordenate(int(square[1]), square[0])
 
     def king_position(self, color: str) -> Coordenate:
         for r in range(8):
@@ -124,7 +133,8 @@ class Board:
         while (f != ord(b.col)) or (r != b.row):
             if (f == ord(b.col)) and (r == b.row):
                 break
-            res.append(Coordenate(chr(f), r))
+            # Coordenate(row, col)
+            res.append(Coordenate(r, chr(f)))
             f += step_f
             r += step_r
             if chr(f) == b.col and r == b.row:
@@ -132,13 +142,15 @@ class Board:
         # quitar extremos si se metió el destino por la condición
         return [c for c in res if not (c.col == b.col and c.row == b.row)]
 
+    # ------------------------ Ataque / Defensa básica ------------------------
+
     def is_square_attacked(self, coord: Coordenate, by_color: str) -> bool:
         # Ataques de peones
         for df in (-1, 1):
             r = coord.row + (-1 if by_color == "white" else 1)
             f = chr(ord(coord.col) + df)
             if f in FILES and 1 <= r <= 8:
-                c = Coordenate(f, r)
+                c = Coordenate(r, f)  # row, col
                 p = self.get_piece_at(c)
                 if p and getattr(p, "color", None) == by_color and getattr(p, "name", getattr(p, "type", None)) == "pawn":
                     return True
@@ -148,7 +160,7 @@ class Board:
             r = coord.row + dr
             f = chr(ord(coord.col) + df)
             if f in FILES and 1 <= r <= 8:
-                c = Coordenate(f, r)
+                c = Coordenate(r, f)  # row, col
                 p = self.get_piece_at(c)
                 if p and getattr(p, "color", None) == by_color and getattr(p, "name", getattr(p, "type", None)) == "knight":
                     return True
@@ -171,7 +183,7 @@ class Board:
                 r = coord.row + dr
                 f = chr(ord(coord.col) + df)
                 if f in FILES and 1 <= r <= 8:
-                    c = Coordenate(f, r)
+                    c = Coordenate(r, f)  # row, col
                     p = self.get_piece_at(c)
                     if p and getattr(p, "color", None) == by_color and getattr(p, "name", getattr(p, "type", None)) == "king":
                         return True
@@ -194,6 +206,8 @@ class Board:
                     return True
                 return False
 
+    # ------------------------ Búsqueda de orígenes (SAN) ---------------------
+
     def find_sources(self, piece_name: str, color: str, to_coord: Coordenate, san_hint: Dict[str, Any]) -> List[Coordenate]:
         """
         Busca piezas del tipo/color dado que podrían ir a 'to_coord' por patrón básico
@@ -210,20 +224,19 @@ class Board:
                 f = chr(ord(to_coord.col) + df)
                 if origin_file and f != origin_file:
                     continue
-                src = Coordenate(f, to_coord.row - (1 if color == "white" else -1))
+                src = Coordenate(to_coord.row - (1 if color == "white" else -1), f)  # row, col
                 if self._on_board(src) and self._is_piece(src, "pawn", color):
-                    # Para SAN mínima nos basta; el capturado se chequeará en apply_move
                     candidates.append(src)
 
             # Avances rectos (1 o 2)
             f = to_coord.col
-            one = Coordenate(f, to_coord.row - (1 if color == "white" else -1))
+            one = Coordenate(to_coord.row - (1 if color == "white" else -1), f)
             if self._on_board(one) and self._is_piece(one, "pawn", color) and self.is_empty(to_coord):
                 candidates.append(one)
             # doble (desde inicial)
             start = 2 if color == "white" else 7
-            two = Coordenate(f, to_coord.row - (2 if color == "white" else -2))
-            inter = Coordenate(f, start + (1 if color == "white" else -1)) if to_coord.row == (start + (2 if color == "white" else -2)) else None
+            two = Coordenate(to_coord.row - (2 if color == "white" else -2), f)
+            inter = Coordenate(start + (1 if color == "white" else -1), f) if to_coord.row == (start + (2 if color == "white" else -2)) else None
             if self._on_board(two) and self._is_piece(two, "pawn", color) and inter and self.is_empty(inter) and self.is_empty(to_coord):
                 candidates.append(two)
 
@@ -250,6 +263,8 @@ class Board:
                     candidates.append(coord)
 
         return candidates
+
+    # ----------------------------- apply_move --------------------------------
 
     def apply_move(self, move: Any) -> None:
         """
@@ -290,7 +305,6 @@ class Board:
             vector_col = (ord(dst.col) - ord(src.col))
             mover.move(vector_row=vector_row, vector_col=vector_col)
         except Exception:
-            # Si tu Piece.move valida y lanza, puedes optar por no llamarlo aquí.
             pass
 
         # Promoción
@@ -304,11 +318,12 @@ class Board:
 
     def _apply_castle(self, color: str, side: str) -> None:
         back = 1 if color == "white" else 8
-        king_from = Coordenate("e", back)
+        # Coordenate(row, col)
+        king_from = Coordenate(back, "e")
         if side == "king":
-            king_to, rook_from, rook_to = Coordenate("g", back), Coordenate("h", back), Coordenate("f", back)
+            king_to, rook_from, rook_to = Coordenate(back, "g"), Coordenate(back, "h"), Coordenate(back, "f")
         else:
-            king_to, rook_from, rook_to = Coordenate("c", back), Coordenate("a", back), Coordenate("d", back)
+            king_to, rook_from, rook_to = Coordenate(back, "c"), Coordenate(back, "a"), Coordenate(back, "d")
 
         king = self.get_piece_at(king_from)
         rook = self.get_piece_at(rook_from)
@@ -325,6 +340,8 @@ class Board:
             king.move(vector_row=0, vector_col=(ord(king_to.col) - ord(king_from.col)))
         except Exception:
             pass
+
+    # ---------------------------- Helpers internos ---------------------------
 
     def _on_board(self, c: Coordenate) -> bool:
         return c.col in FILES and 1 <= c.row <= 8
@@ -355,7 +372,7 @@ class Board:
         if name == "rook":
             return (df == 0 or dr == 0) and not (df == 0 and dr == 0)
         if name == "queen":
-            return (adf == adr and adf > 0) or (df == 0 or dr == 0) and not (df == 0 and dr == 0)
+            return (adf == adr and adf > 0) or ((df == 0 or dr == 0) and not (df == 0 and dr == 0))
         if name == "pawn":
             # Patrón mínimo; las verificaciones finas (bloqueos, capturas) las hace quien llama.
             return True
@@ -365,6 +382,8 @@ class Board:
         # Para piezas deslizantes (bishop/rook/queen)
         between = self.squares_between(src, dst)
         return all(self.is_empty(c) for c in between)
+
+    # ----------------------------- Debug opcional ----------------------------
 
     def to_ascii(self) -> str:
         """
