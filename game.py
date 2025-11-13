@@ -14,7 +14,7 @@ from board.coordenates import Coordenate
 from pieces.queen import Queen  # para promoción
 
 # ---------- ventana ----------
-TILE_SIZE = 96
+TILE_SIZE = 64
 BOARD_SIZE = 8
 WINDOW_W = TILE_SIZE * BOARD_SIZE
 WINDOW_H = TILE_SIZE * BOARD_SIZE
@@ -256,6 +256,13 @@ def generate_moves(board: Board, src: Coordenate, turn: str) -> List[Coordenate]
             diag = Coordenate(src.row + direction, chr(ord(src.col) + dx))
             if 1 <= diag.row <= 8 and diag.col in "abcdefgh" and enemy_at(board, diag, color):
                 res.append(diag)
+        # captura al paso
+        for dx in (-1, 1):
+            diag = Coordenate(src.row, chr(ord(src.col) + dx))
+            dest = Coordenate(src.row + direction, chr(ord(src.col) + dx))
+            if 1 <= diag.row <= 8 and (diag.row == 5 or diag.row == 4) and diag.col in "abcdefgh" and enemy_at(board,diag,color):
+                res.append(dest)
+
         return res
 
     return res
@@ -270,9 +277,10 @@ def legal_moves(board: Board, src: Coordenate, turn: str) -> List[Coordenate]:
             safe.append(dst)
     return safe
 
-def apply_simple_move(board: Board, src: Coordenate, dst: Coordenate):
+def apply_simple_move(board: Board, src: Coordenate, dst: Coordenate, type=""):
     """Aplica movimiento físico (sin enroque ni EP). Maneja promoción a dama."""
     mover = board.get_piece_at(src)
+
     captured = board.get_piece_at(dst)
     board._set_piece_at(src, None)
     board._set_piece_at(dst, mover)
