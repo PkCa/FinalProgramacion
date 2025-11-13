@@ -19,22 +19,20 @@ BOARD_SIZE = 8
 WINDOW_W = TILE_SIZE * BOARD_SIZE
 WINDOW_H = TILE_SIZE * BOARD_SIZE
 
-# fallback colores si no usás board.png
 LIGHT_SQ = (240, 217, 181)
 DARK_SQ  = (181, 136, 99)
 
 HOVER_COLOR = (255, 255, 0, 60)
 SEL_COLOR   = (0, 200, 255, 80)
-MOVE_COLOR  = (80, 160, 120, 120)  # destinos válidos
+MOVE_COLOR  = (80, 160, 120, 120)
 
-# Map de archivos de sprites (en carpeta ./sprites)
 NAME_TO_SPRITEBASE = {
     "pawn":   "pawn",
     "rook":   "rook",
     "bishop": "bishop",
     "queen":  "queen",
     "king":   "king",
-    "knight": "knight",  # <- asegurate que existan knight_white/black.png
+    "knight": "knight"
 }
 
 # ---------- helpers de coordenadas ----------
