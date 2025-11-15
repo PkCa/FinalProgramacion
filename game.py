@@ -1,7 +1,7 @@
 # game.py
 # ---------------------------------------------------------------------
 # Click-to-move con Pygame + Board. Promoción simple a Dama.
-# (Sin enroque ni en passant para mantenerlo simple por ahora.)
+# Ahora con captura al paso (en passant). Sin enroque todavía.
 # ---------------------------------------------------------------------
 
 import os
@@ -135,24 +135,54 @@ def same_color_at(board: Board, dst: Coordenate, my_color: str) -> bool:
     p = board.get_piece_at(dst)
     return bool(p) and getattr(p, "color", None) == my_color
 
-def king_safe_after(board: Board, src: Coordenate, dst: Coordenate, my_color: str) -> bool:
+def king_safe_after(
+    board: Board,
+    src: Coordenate,
+    dst: Coordenate,
+    my_color: str,
+    en_passant_target: Optional[Coordenate] = None
+) -> bool:
     """
     Simula src->dst y verifica si el rey propio queda a salvo.
+    Maneja también el caso especial de captura al paso.
     """
     enemy = "black" if my_color == "white" else "white"
     mover = board.get_piece_at(src)
-    captured = board.get_piece_at(dst)
 
     if mover is None:
         return False
 
-    # aplicar
+    name = getattr(mover, "name", getattr(mover, "type", None))
+
+    # Detectar si este movimiento es una captura al paso
+    is_en_passant = False
+    ep_captured_square: Optional[Coordenate] = None
+    captured_at_dst = None
+    captured_ep = None
+
+    if (
+        en_passant_target is not None and
+        name == "pawn" and
+        dst.row == en_passant_target.row and
+        dst.col == en_passant_target.col and
+        board.is_empty(dst) and
+        dst.col != src.col
+    ):
+        # peón se mueve diagonal a una casilla vacía que coincide con el target EP
+        is_en_passant = True
+        ep_captured_square = Coordenate(src.row, dst.col)
+        captured_ep = board.get_piece_at(ep_captured_square)
+    else:
+        captured_at_dst = board.get_piece_at(dst)
+
+    # aplicar movimiento
     board._set_piece_at(src, None)
+    if is_en_passant and ep_captured_square:
+        board._set_piece_at(ep_captured_square, None)
     board._set_piece_at(dst, mover)
 
     try:
         # localizar rey (si el que se movió es el rey, su nueva pos es dst)
-        name = getattr(mover, "name", getattr(mover, "type", None))
         if name == "king":
             kpos = dst
         else:
@@ -162,13 +192,21 @@ def king_safe_after(board: Board, src: Coordenate, dst: Coordenate, my_color: st
         return not in_check
     finally:
         # revertir
-        board._set_piece_at(dst, captured)
+        board._set_piece_at(dst, captured_at_dst)
+        if is_en_passant and ep_captured_square:
+            board._set_piece_at(ep_captured_square, captured_ep)
         board._set_piece_at(src, mover)
 
-def generate_moves(board: Board, src: Coordenate, turn: str) -> List[Coordenate]:
+def generate_moves(
+    board: Board,
+    src: Coordenate,
+    turn: str,
+    en_passant_target: Optional[Coordenate] = None
+) -> List[Coordenate]:
     """
     Devuelve destinos pseudo-legales (patrones + bloqueos + sin capturar aliado).
     Filtrado de jaque propio se hace aparte.
+    Incluye captura al paso usando en_passant_target.
     """
     piece = board.get_piece_at(src)
     if not piece:
@@ -241,6 +279,7 @@ def generate_moves(board: Board, src: Coordenate, turn: str) -> List[Coordenate]
     if name == "pawn":
         direction = 1 if color == "white" else -1
         start = 2 if color == "white" else 7
+
         # un paso
         one = Coordenate(src.row + direction, src.col)
         if 1 <= one.row <= 8 and board.is_empty(one):
@@ -251,37 +290,85 @@ def generate_moves(board: Board, src: Coordenate, turn: str) -> List[Coordenate]
                 inter = Coordenate(src.row + direction, src.col)
                 if 1 <= two.row <= 8 and board.is_empty(two) and board.is_empty(inter):
                     res.append(two)
-        # capturas diagonales
+
+        # capturas diagonales normales
         for dx in (-1, 1):
             diag = Coordenate(src.row + direction, chr(ord(src.col) + dx))
             if 1 <= diag.row <= 8 and diag.col in "abcdefgh" and enemy_at(board, diag, color):
                 res.append(diag)
-        # captura al paso
-        for dx in (-1, 1):
-            diag = Coordenate(src.row, chr(ord(src.col) + dx))
-            dest = Coordenate(src.row + direction, chr(ord(src.col) + dx))
-            if 1 <= diag.row <= 8 and (diag.row == 5 or diag.row == 4) and diag.col in "abcdefgh" and enemy_at(board,diag,color):
-                res.append(dest)
+
+        # captura al paso usando en_passant_target
+        if en_passant_target is not None:
+            # el destino EP debe estar una fila adelante y a una columna de distancia
+            if (
+                en_passant_target.row == src.row + direction and
+                abs(ord(en_passant_target.col) - ord(src.col)) == 1
+            ):
+                # debe haber un peón enemigo en la casilla adyacente horizontal
+                victim_square = Coordenate(src.row, en_passant_target.col)
+                victim = board.get_piece_at(victim_square)
+                v_name = getattr(victim, "name", getattr(victim, "type", None)) if victim else None
+                v_color = getattr(victim, "color", None) if victim else None
+                if victim and v_name == "pawn" and v_color != color:
+                    res.append(en_passant_target)
 
         return res
 
     return res
 
-def legal_moves(board: Board, src: Coordenate, turn: str) -> List[Coordenate]:
+def legal_moves(
+    board: Board,
+    src: Coordenate,
+    turn: str,
+    en_passant_target: Optional[Coordenate] = None
+) -> List[Coordenate]:
     """Pseudo-legales filtrados por 'rey a salvo' tras el movimiento."""
     my_color = turn
-    candidates = generate_moves(board, src, turn)
+    candidates = generate_moves(board, src, turn, en_passant_target)
     safe: List[Coordenate] = []
     for dst in candidates:
-        if king_safe_after(board, src, dst, my_color):
+        if king_safe_after(board, src, dst, my_color, en_passant_target):
             safe.append(dst)
     return safe
 
-def apply_simple_move(board: Board, src: Coordenate, dst: Coordenate, type=""):
-    """Aplica movimiento físico (sin enroque ni EP). Maneja promoción a dama."""
+def apply_simple_move(
+    board: Board,
+    src: Coordenate,
+    dst: Coordenate,
+    en_passant_target: Optional[Coordenate] = None
+) -> Optional[Coordenate]:
+    """
+    Aplica movimiento físico, incluyendo captura al paso.
+    Maneja promoción a dama.
+    Devuelve la nueva casilla de en-passant (si queda habilitada) o None.
+    """
     mover = board.get_piece_at(src)
+    if mover is None:
+        return None
 
-    captured = board.get_piece_at(dst)
+    name = getattr(mover, "name", getattr(mover, "type", None))
+    color = getattr(mover, "color", None)
+
+    # Detectar si este movimiento es captura al paso
+    is_en_passant = False
+    if (
+        en_passant_target is not None and
+        name == "pawn" and
+        dst.row == en_passant_target.row and
+        dst.col == en_passant_target.col and
+        board.is_empty(dst) and
+        dst.col != src.col
+    ):
+        is_en_passant = True
+        victim_square = Coordenate(src.row, dst.col)
+        # eliminar el peón capturado
+        board._set_piece_at(victim_square, None)
+
+    # captura normal en la casilla destino (si no es EP)
+    if not is_en_passant:
+        _captured = board.get_piece_at(dst)  # no la usamos, pero la dejamos por si luego querés logging
+
+    # mover pieza
     board._set_piece_at(src, None)
     board._set_piece_at(dst, mover)
 
@@ -294,12 +381,19 @@ def apply_simple_move(board: Board, src: Coordenate, dst: Coordenate, type=""):
         pass
 
     # promoción simple a dama
-    name = getattr(mover, "name", getattr(mover, "type", None))
-    color = getattr(mover, "color", None)
     if name == "pawn":
         if (color == "white" and dst.row == 8) or (color == "black" and dst.row == 1):
             q = Queen(color, dst.col, dst.row)
             board._set_piece_at(dst, q)
+
+    # determinar nuevo en_passant_target
+    new_en_passant_target: Optional[Coordenate] = None
+    if name == "pawn" and abs(dst.row - src.row) == 2:
+        # peón avanzó dos casillas -> casilla intermedia es el target para EP
+        mid_row = (src.row + dst.row) // 2
+        new_en_passant_target = Coordenate(mid_row, src.col)
+
+    return new_en_passant_target
 
 # ---------- main loop ----------
 def main():
@@ -317,6 +411,8 @@ def main():
     sel_sq: Optional[Tuple[int,int]] = None
     hover_sq: Optional[Tuple[int,int]] = None
     legal: List[Coordenate] = []
+
+    en_passant_target: Optional[Coordenate] = None
 
     running = True
     while running:
@@ -341,7 +437,7 @@ def main():
                     p = board.get_piece_at(clicked)
                     if p and getattr(p, "color", None) == turn:
                         sel_sq = (r, c)
-                        legal = legal_moves(board, clicked, turn)
+                        legal = legal_moves(board, clicked, turn, en_passant_target)
                     else:
                         sel_sq = None
                         legal = []
@@ -357,14 +453,18 @@ def main():
                     q = board.get_piece_at(clicked)
                     if q and getattr(q, "color", None) == turn:
                         sel_sq = (r, c)
-                        legal = legal_moves(board, clicked, turn)
+                        legal = legal_moves(board, clicked, turn, en_passant_target)
                         continue
 
                     # si es destino válido, mover
                     if any((d.row == clicked.row and d.col == clicked.col) for d in legal):
-                        apply_simple_move(board, src, clicked)
+                        # aplicar movimiento y actualizar en_passant_target
+                        new_ep = apply_simple_move(board, src, clicked, en_passant_target)
+                        en_passant_target = new_ep  # si el movimiento no fue doble-peón, queda None
+
                         # cambio de turno
                         turn = "black" if turn == "white" else "white"
+
                     # reset selección
                     sel_sq = None
                     legal = []
